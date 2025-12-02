@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EV Calculator | TCO Analysis</title>
     
+    <!-- Dynamic Favicon (Matches Brand Gradient & Icon) -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23f8997d'/%3E%3Cstop offset='100%25' stop-color='%23ad336d'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='25' fill='url(%23g)'/%3E%3Cpath fill='white' d='M58 15 L32 55 L48 55 L42 85 L68 45 L52 45 L58 15 Z' stroke='white' stroke-width='4' stroke-linejoin='round'/%3E%3C/svg%3E" type="image/svg+xml">
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -364,7 +367,7 @@
                     <!-- CO2 Saved (New Card) -->
                     <div class="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/5">
                         <div class="text-[10px] uppercase text-slate-500 font-bold mb-1.5 tracking-wider">Carbon Reduction</div>
-                        <div class="text-2xl font-bold font-mono text-teal-400" id="res-total-co2">0 t</div>
+                        <div class="text-2xl font-bold font-mono text-green-400" id="res-total-co2">0 t</div>
                         <div class="text-[10px] text-slate-400 mt-2 font-medium">Lifetime CO2 Abated</div>
                     </div>
 
@@ -636,6 +639,11 @@
             let currElec = elecPrice;
             let breakevenYear = null;
 
+            // Check if EV is cheaper from Day 0
+            if (evRunningTotal < iceRunningTotal) {
+                breakevenYear = 0;
+            }
+
             for(let i=1; i<=years; i++) {
                 // Inflate
                 currFuel *= (1 + infFuel/100);
@@ -652,7 +660,15 @@
                 labels.push(`Year ${i}`);
 
                 if (breakevenYear === null && evRunningTotal < iceRunningTotal) {
-                    breakevenYear = i;
+                    // Linear Interpolation for precise month
+                    const prevEv = evCostArr[i-1];
+                    const prevIce = iceCostArr[i-1];
+                    const diffPrev = prevEv - prevIce; // Positive gap
+                    const diffCurr = evRunningTotal - iceRunningTotal; // Negative gap
+                    
+                    // Calculate fraction of the year where crossing occurred
+                    const fraction = diffPrev / (diffPrev - diffCurr);
+                    breakevenYear = (i - 1) + fraction;
                 }
             }
 
@@ -673,14 +689,34 @@
             const cpkEv = evRunningTotal / (annualKm * years);
             const cpkIce = iceRunningTotal / (annualKm * years);
 
+            // Dynamic Styling based on result
+            const resultClass = totalSavings > 0 ? "text-2xl font-bold font-mono text-primary" : "text-2xl font-bold font-mono text-secondary";
+
             document.getElementById('res-savings').innerText = formatMoney(totalSavings);
-            document.getElementById('res-savings').className = totalSavings > 0 ? "text-2xl font-bold font-mono text-primary" : "text-2xl font-bold font-mono text-secondary";
+            document.getElementById('res-savings').className = resultClass;
             document.getElementById('res-savings-sub').innerText = totalSavings > 0 ? "Cheaper to go EV" : "Cheaper to go ICE";
+
+            document.getElementById('res-breakeven').className = resultClass;
 
             document.getElementById('res-trees').innerText = Math.max(0, trees).toFixed(0);
             document.getElementById('res-total-co2').innerText = (Math.max(0, co2Saved)/1000).toFixed(1) + " t";
             
-            document.getElementById('res-breakeven').innerText = (breakevenYear !== null) ? breakevenYear + " Years" : "Never";
+            // Format Break-even text
+            let breakevenText = "Never";
+            if (breakevenYear !== null) {
+                if (breakevenYear === 0) {
+                    breakevenText = "Day 1";
+                } else {
+                    let yrs = Math.floor(breakevenYear);
+                    let mths = Math.round((breakevenYear - yrs) * 12);
+                    if (mths === 12) { yrs++; mths = 0; }
+                    
+                    if (yrs > 0 && mths > 0) breakevenText = `${yrs} Yr ${mths} Mo`;
+                    else if (yrs > 0) breakevenText = `${yrs} Years`;
+                    else breakevenText = `${mths} Months`;
+                }
+            }
+            document.getElementById('res-breakeven').innerText = breakevenText;
             
             // const interestDiff = Math.abs(evInterest - iceInterest);
             // document.getElementById('res-interest').innerText = formatMoney(interestDiff);
