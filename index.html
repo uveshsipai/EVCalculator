@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV Calculator | TCO Analysis</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#ad336d',
+                        secondary: '#f8997d',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- FontAwesome (Icons) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            background-image: radial-gradient(ellipse at top, rgba(173, 51, 109, 0.25), #0f172a, #0f172a); /* Updated glow to primary */
+            color: #e2e8f0;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Glassmorphism */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .glass-panel.highlight {
+            background: rgba(173, 51, 109, 0.15); /* Primary tint */
+            border-color: rgba(173, 51, 109, 0.3);
+            box-shadow: 0 4px 30px rgba(173, 51, 109, 0.1);
+        }
+
+        /* Brand Gradient */
+        .bg-gradient-brand {
+            background: linear-gradient(135deg, #f8997d 0%, #ad336d 100%);
+        }
+
+        /* Custom Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #ad336d; /* Primary Color */
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 0 2px #3f1225; /* Darker ring */
+            transition: transform 0.1s;
+        }
+
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+
+        /* Toggle Switch */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #ad336d;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #ad336d;
+        }
+        
+        /* Tab Transitions */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-16 selection:bg-primary/30">
+
+    <!-- Header -->
+    <header class="border-b border-white/5 bg-slate-950/50 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 md:px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-4">
+                <div class="bg-gradient-brand p-2.5 rounded-xl shadow-lg shadow-primary/20 text-white w-10 h-10 flex items-center justify-center">
+                    <i class="fas fa-bolt text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                        EV Calculator
+                    </h1>
+                    <p class="text-xs text-slate-400 font-medium mt-0.5">TCO Calculator with Inflation & Finance Modeling</p>
+                </div>
+            </div>
+            
+            <!-- Navigation -->
+            <div class="flex bg-slate-900/80 p-1.5 rounded-xl border border-white/5">
+                <button onclick="switchTab('inputs')" id="btn-inputs" class="px-5 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all bg-primary text-white shadow-lg shadow-primary/50">Configure</button>
+                <button onclick="switchTab('dashboard')" id="btn-dashboard" class="px-5 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all text-slate-400 hover:text-white hover:bg-white/5">Analyze</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 md:px-6 py-10">
+
+        <!-- INPUTS TAB -->
+        <div id="tab-inputs" class="tab-content active space-y-8">
+            
+            <!-- Usage Profile Bar -->
+            <div class="glass-panel rounded-2xl p-6 flex flex-col md:flex-row gap-8 items-center justify-between">
+                <div class="flex items-center gap-4 w-full md:w-auto">
+                    <div class="p-3 rounded-full bg-primary/10 text-primary">
+                        <i class="fas fa-sliders-h"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-sm uppercase tracking-widest text-white">Usage Profile</h3>
+                        <p class="text-xs text-slate-400 mt-1">Driving habits & timeline</p>
+                    </div>
+                </div>
+                
+                <div class="flex-1 w-full grid grid-cols-1 md:grid-cols-2 gap-12 px-4">
+                    <!-- Daily Travel Slider -->
+                    <div>
+                        <div class="flex justify-between items-center text-xs text-slate-400 mb-2.5">
+                            <span class="font-medium whitespace-nowrap">Daily Travel</span>
+                            <span class="font-mono text-slate-200 bg-white/5 px-2 py-0.5 rounded whitespace-nowrap"><span id="val-daily">40</span> km/day</span>
+                        </div>
+                        <input type="range" id="in-daily" min="10" max="200" step="5" value="40" oninput="updateVal('val-daily', this.value); calc()">
+                    </div>
+                    
+                    <!-- Ownership Slider -->
+                    <div>
+                        <div class="flex justify-between items-center text-xs text-slate-400 mb-2.5">
+                            <span class="font-medium whitespace-nowrap">Ownership Period</span>
+                            <span class="font-mono text-slate-200 bg-white/5 px-2 py-0.5 rounded whitespace-nowrap"><span id="val-years">8</span> years</span>
+                        </div>
+                        <input type="range" id="in-years" min="3" max="15" step="1" value="8" oninput="updateVal('val-years', this.value); calc()">
+                    </div>
+                </div>
+
+                <div class="text-right min-w-[150px] border-l border-white/10 pl-6 hidden md:block">
+                    <div class="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Annual Distance</div>
+                    <div class="font-mono text-primary text-2xl font-bold"><span id="res-annual-km">14,600</span> <span class="text-sm text-primary/70">km</span></div>
+                </div>
+            </div>
+
+            <!-- Advanced Finance Toggle Section -->
+            <div class="bg-slate-900/40 border border-slate-800 rounded-xl overflow-hidden">
+                <button onclick="toggleFinance()" class="w-full flex items-center justify-between p-4 text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                    <span class="flex items-center gap-2"><i class="fas fa-landmark"></i> Finance & Inflation Assumptions</span>
+                    <span id="finance-toggle-text">Show</span>
+                </button>
+                
+                <div id="finance-panel" class="hidden p-6 grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-slate-800 animate-fadeIn">
+                    <div>
+                        <!-- Finance Toggle -->
+                        <div class="flex items-center justify-between mb-5 p-4 bg-gradient-to-r from-slate-900/80 to-slate-900/40 rounded-xl border border-white/5">
+                            <span class="text-xs font-medium text-slate-300 flex items-center gap-2.5">
+                                <i class="fas fa-file-invoice-dollar text-yellow-400"></i> Vehicle Financed (Loan)?
+                            </span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="in-is-financed" class="sr-only peer" onchange="calc()">
+                                <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                        </div>
+
+                        <div id="loan-inputs" class="grid grid-cols-2 gap-4 pl-4 border-l-2 border-primary/20 transition-opacity duration-300 opacity-30 pointer-events-none">
+                            <div class="mb-2">
+                                <label class="text-[10px] uppercase text-slate-500 font-bold mb-1 block">Interest Rate (%)</label>
+                                <input type="number" id="in-rate" value="9.5" step="0.1" class="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none" oninput="calc()">
+                            </div>
+                            <div class="mb-2">
+                                <label class="text-[10px] uppercase text-slate-500 font-bold mb-1 block">Tenure (Yrs)</label>
+                                <input type="number" id="in-term" value="5" class="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none" oninput="calc()">
+                            </div>
+                            <div class="mb-2">
+                                <label class="text-[10px] uppercase text-slate-500 font-bold mb-1 block">Down Payment (%)</label>
+                                <input type="number" id="in-downpayment" value="20" class="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none" oninput="calc()">
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold uppercase text-slate-500 mb-4 flex items-center gap-2"><i class="fas fa-chart-line"></i> Annual Inflation</h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-[10px] uppercase text-slate-500 font-bold mb-1 block">Fuel Price Hike (%)</label>
+                                <input type="number" id="in-inf-fuel" value="5.0" step="0.5" class="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none" oninput="calc()">
+                            </div>
+                            <div>
+                                <label class="text-[10px] uppercase text-slate-500 font-bold mb-1 block">Elec Price Hike (%)</label>
+                                <input type="number" id="in-inf-elec" value="2.0" step="0.5" class="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none" oninput="calc()">
+                            </div>
+                        </div>
+                        <p class="text-[10px] text-slate-500 mt-2">Historical average fuel inflation in India is ~5-6% annually.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vehicles Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                <!-- EV Column -->
+                <div class="space-y-6">
+                    <div id="ev-card" class="glass-panel rounded-2xl p-6 transition-all duration-300">
+                        <div class="flex items-center gap-2 mb-5 border-b border-white/10 pb-4">
+                            <i class="fas fa-bolt text-primary" id="ev-icon"></i>
+                            <h3 class="font-bold text-xs uppercase tracking-widest text-slate-400" id="ev-title">Electric Vehicle (EV)</h3>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label class="text-[10px] uppercase text-slate-500 font-bold mb-1 block">On-Road Price (₹)</label>
+                                <input type="number" id="in-ev-price" value="1850000" step="1000" class="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none font-mono" oninput="calc()">
+                            </div>
+                            <div>
+                                <label class="text-[10px] uppercase text-slate-500 font-bold mb-1 block">Subsidy (₹)</label>
+                                <input type="number" id="in-ev-subsidy" value="0" step="1000" class="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none font-mono" oninput="calc()">
+                            </div>
+                        </div>
+
+                        <div class="h-px bg-white/10 my-6"></div>
+
+                        <!-- Solar Box -->
+                        <div id="solar-box" class="rounded-xl p-4 border mb-6 transition-all duration-300 bg-slate-900/40 border-slate-700/50">
+                            <div class="flex items-center justify-between mb-4">
+                                <span class="text-xs font-medium text-slate-300 flex items-center gap-2.5">
+                                    <i class="fas fa-sun text-slate-500" id="solar-icon"></i> Solar Rooftop?
+                                </span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="in-solar" class="sr-only peer" onchange="toggleSolar(); calc()">
+                                    <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+                                </label>
+                            </div>
+                            
+                            <div id="grid-rate-input">
+                                <label class="text-[10px] uppercase text-slate-500 font-bold mb-1 block">Grid Rate (₹/kWh)</label>
+                                <input type="number" id="in-elec-price" value="8.0" step="0.1" class="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none font-mono" oninput="calc()">
+                            </div>
+                            <div id="solar-rate-input" class="hidden">
+                                <label class="text-[10px] uppercase text-secondary font-bold mb-1 block">Solar Export Rate (₹/kWh)</label>
+                                <input type="number" id="in-solar-price" value="2.5" step="0.1" class="w-full bg-slate-900/50 border border-secondary/30 rounded-lg px-3 py-2 text-sm text-yellow-100 focus:border-secondary outline-none font-mono" oninput="calc()">
+                                <p class="text-[10px] text-slate-500 mt-1">Export/Opportunity Cost</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs text-slate-400 mb-2.5">
+                                <span class="font-medium">Efficiency (Wh/km)</span>
+                                <span class="font-mono text-slate-200 bg-white/5 px-2 py-0.5 rounded"><span id="val-eff">145</span> Wh/km</span>
+                            </div>
+                            <input type="range" id="in-eff" min="100" max="250" step="5" value="145" oninput="updateVal('val-eff', this.value); calc()">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ICE Column -->
+                <div class="space-y-6">
+                    <div class="glass-panel rounded-2xl p-6 h-full flex flex-col">
+                        <div class="flex items-center gap-2 mb-5 border-b border-white/10 pb-4">
+                            <i class="fas fa-gas-pump text-secondary"></i>
+                            <h3 class="font-bold text-xs uppercase tracking-widest text-slate-400">Combustion Vehicle (ICE)</h3>
+                        </div>
+
+                        <div class="mb-6">
+                            <label class="text-[10px] uppercase text-slate-500 font-bold mb-1 block">On-Road Price (₹)</label>
+                            <input type="number" id="in-ice-price" value="1500000" step="1000" class="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none font-mono" oninput="calc()">
+                        </div>
+
+                        <div class="h-px bg-white/10 my-6"></div>
+
+                        <div class="mb-6">
+                            <div class="flex justify-between text-xs text-slate-400 mb-2.5">
+                                <span class="font-medium">Mileage (km/L)</span>
+                                <span class="font-mono text-slate-200 bg-white/5 px-2 py-0.5 rounded"><span id="val-mileage">14.0</span> km/L</span>
+                            </div>
+                            <input type="range" id="in-mileage" min="8" max="25" step="0.5" value="14" oninput="updateVal('val-mileage', this.value); calc()">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mt-auto">
+                            <div>
+                                <label class="text-[10px] uppercase text-slate-500 font-bold mb-1 block">Current Fuel (₹/L)</label>
+                                <input type="number" id="in-fuel-price" value="96.0" step="0.5" class="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none font-mono" oninput="calc()">
+                            </div>
+                            <div>
+                                <label class="text-[10px] uppercase text-slate-500 font-bold mb-1 block">Yearly Maint (₹)</label>
+                                <input type="number" id="in-ice-maint" value="12000" step="500" class="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-primary outline-none font-mono" oninput="calc()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Big Analyze Button -->
+            <div class="flex justify-center mt-8">
+                <button onclick="switchTab('dashboard')" class="group relative inline-flex items-center justify-center px-12 py-4 text-lg font-bold text-white transition-all duration-200 bg-primary rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary hover:bg-opacity-90 w-full md:w-auto min-w-[300px] shadow-lg shadow-primary/40 hover:scale-105">
+                    <span class="relative flex items-center gap-3">
+                        Generate Analysis Report <i class="fas fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        <!-- DASHBOARD TAB -->
+        <div id="tab-dashboard" class="tab-content">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                
+                <!-- TOP STATS -->
+                <div class="lg:col-span-12 grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <!-- Net Savings -->
+                    <div class="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/5">
+                        <div class="text-[10px] uppercase text-slate-500 font-bold mb-1.5 tracking-wider">Net Savings (<span id="txt-years">8</span>yr)</div>
+                        <div class="text-2xl font-bold font-mono text-primary" id="res-savings">₹0</div>
+                        <div class="text-[10px] text-slate-400 mt-2 font-medium" id="res-savings-sub">Cheaper to go EV</div>
+                    </div>
+                    
+                    <!-- Break Even -->
+                    <div class="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/5">
+                        <div class="text-[10px] uppercase text-slate-500 font-bold mb-1.5 tracking-wider">Cost Break-Even</div>
+                        <div class="text-2xl font-bold font-mono text-white" id="res-breakeven">--</div>
+                        <div class="text-[10px] text-slate-400 mt-2 font-medium">Includes Fuel Inflation</div>
+                    </div>
+
+                    <!-- CO2 Saved (New Card) -->
+                    <div class="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/5">
+                        <div class="text-[10px] uppercase text-slate-500 font-bold mb-1.5 tracking-wider">Carbon Reduction</div>
+                        <div class="text-2xl font-bold font-mono text-teal-400" id="res-total-co2">0 t</div>
+                        <div class="text-[10px] text-slate-400 mt-2 font-medium">Lifetime CO2 Abated</div>
+                    </div>
+
+                    <!-- Trees -->
+                    <div class="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/5 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <i class="fas fa-tree text-4xl text-green-400"></i>
+                        </div>
+                        <div class="text-[10px] uppercase text-slate-500 font-bold mb-1.5 tracking-wider">Ecological Impact</div>
+                        <div class="text-2xl font-bold font-mono text-green-400" id="res-trees">0</div>
+                        <div class="text-[10px] text-slate-400 mt-2 font-medium">Equivalent mature trees</div>
+                    </div>
+                </div>
+
+                <!-- CHART AREA -->
+                <div class="lg:col-span-8">
+                    <div class="glass-panel rounded-2xl p-6 h-[400px]">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i class="fas fa-dollar-sign text-secondary"></i>
+                            <h3 class="font-bold text-xs uppercase tracking-widest text-slate-400">Total Cost of Ownership (Cumulative)</h3>
+                        </div>
+                        <div class="relative h-[320px] w-full">
+                            <canvas id="costChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- INSIGHTS -->
+                <div class="lg:col-span-4">
+                    <div class="glass-panel highlight rounded-2xl p-6 h-full flex flex-col">
+                        <div class="flex items-center gap-2 mb-6 border-b border-primary/20 pb-4">
+                            <i class="fas fa-chart-line text-primary"></i>
+                            <h3 class="font-bold text-xs uppercase tracking-widest text-primary">Financial Reality Check</h3>
+                        </div>
+
+                        <div class="space-y-8 flex-1">
+                            <div>
+                                <div class="text-xs text-slate-400 uppercase font-bold mb-2">Cost Per KM (Lifecycle)</div>
+                                <div class="flex justify-between items-end mb-2">
+                                    <span class="text-3xl font-mono text-primary font-bold" id="res-cpk-ev">₹0.0</span>
+                                    <span class="text-3xl font-mono text-secondary font-bold" id="res-cpk-ice">₹0.0</span>
+                                </div>
+                                <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden flex">
+                                    <div id="bar-ev" class="bg-primary h-full transition-all duration-1000" style="width: 50%"></div>
+                                    <div class="bg-secondary h-full flex-1"></div>
+                                </div>
+                                <div class="flex justify-between text-[10px] text-slate-500 mt-1 font-bold uppercase">
+                                    <span>EV</span>
+                                    <span>ICE</span>
+                                </div>
+                            </div>
+
+                            <div class="p-4 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+                                <h4 class="text-indigo-300 font-bold text-xs uppercase mb-2 flex items-center gap-2"><i class="fas fa-landmark"></i> Impact of Loan</h4>
+                                <p class="text-xs text-indigo-200 leading-relaxed">
+                                    Since the EV costs <strong id="res-diff-upfront" class="text-white">₹0</strong> more upfront, you pay approx <strong id="res-diff-interest" class="text-white">₹0</strong> more in loan interest, which slightly delays your breakeven point.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="border-t border-white/5 bg-slate-950/30 backdrop-blur-md py-8 mt-auto">
+        <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="text-slate-400 text-sm font-medium">
+                Built by <span class="text-primary font-bold text-base ml-1">Prof. Uvesh Sipai</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="https://www.linkedin.com/in/uveshsipai/" target="_blank" class="group flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all">
+                    <i class="fab fa-linkedin text-blue-400 group-hover:scale-110 transition-transform"></i>
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-300 group-hover:text-white">LinkedIn</span>
+                </a>
+                <a href="https://uveshsipai.com" target="_blank" class="group flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all">
+                    <i class="fas fa-globe text-emerald-400 group-hover:scale-110 transition-transform"></i>
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-300 group-hover:text-white">Website</span>
+                </a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- LOGIC -->
+    <script>
+        // Constants
+        const CONSTANTS = {
+            CO2_GRID: 820,
+            CO2_SOLAR: 45,
+            CO2_ICE_MFG: 7500,
+            CO2_EV_BODY_MFG: 7500,
+            CO2_BATT_MFG: 125,
+            CO2_PETROL: 2.31,
+            WTT_FACTOR: 1.25,
+            CO2_PER_TREE: 25, // kg per year per tree
+            BATT_SIZE: 45, // kWh Fixed for simplicity
+            EV_MAINT: 4000
+        };
+
+        // Colors
+        const COLORS = {
+            primary: '#ad336d',
+            secondary: '#f8997d',
+            bg: 'rgba(173, 51, 109, 0.1)',
+            grid: 'rgba(255, 255, 255, 0.05)',
+            text: '#94a3b8'
+        };
+
+        // State
+        let costChartInstance = null;
+        let chartData = {};
+
+        // Helper: Format Currency
+        const formatMoney = (num) => {
+            return "₹" + Math.abs(num).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+        };
+
+        // Helper: PMT-like Loan Calc
+        const calculateLoanInterest = (principal, rate, years) => {
+            if(principal <= 0) return 0;
+            const r = rate / 1200;
+            const n = years * 12;
+            const emi = (principal * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+            return (emi * n) - principal; 
+        };
+
+        // UI Updates
+        function updateVal(id, val) {
+            document.getElementById(id).innerText = val;
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+            
+            // Button Styles
+            ['inputs', 'dashboard'].forEach(t => {
+                const btn = document.getElementById('btn-' + t);
+                if(t === tab) {
+                    btn.className = "px-5 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all bg-primary text-white shadow-lg shadow-primary/50";
+                } else {
+                    btn.className = "px-5 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all text-slate-400 hover:text-white hover:bg-white/5";
+                }
+            });
+
+            if(tab === 'dashboard') renderCostChart();
+        }
+
+        function toggleFinance() {
+            const panel = document.getElementById('finance-panel');
+            const text = document.getElementById('finance-toggle-text');
+            if(panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                text.innerText = "Hide";
+            } else {
+                panel.classList.add('hidden');
+                text.innerText = "Show";
+            }
+        }
+
+        function toggleSolar() {
+            const isSolar = document.getElementById('in-solar').checked;
+            const gridInp = document.getElementById('grid-rate-input');
+            const solarInp = document.getElementById('solar-rate-input');
+            const box = document.getElementById('solar-box');
+            const icon = document.getElementById('solar-icon');
+            const evCard = document.getElementById('ev-card');
+            const evIcon = document.getElementById('ev-icon');
+            const evTitle = document.getElementById('ev-title');
+
+            if(isSolar) {
+                gridInp.classList.add('hidden');
+                solarInp.classList.remove('hidden');
+                box.className = "rounded-xl p-4 border mb-6 transition-all duration-300 bg-secondary/10 border-secondary/30";
+                icon.className = "fas fa-sun text-secondary";
+                
+                // Highlight Card
+                evCard.className = "glass-panel highlight rounded-2xl p-6 transition-all duration-300";
+                evIcon.className = "fas fa-bolt text-primary";
+                evTitle.className = "font-bold text-xs uppercase tracking-widest text-primary";
+            } else {
+                gridInp.classList.remove('hidden');
+                solarInp.classList.add('hidden');
+                box.className = "rounded-xl p-4 border mb-6 transition-all duration-300 bg-slate-900/40 border-slate-700/50";
+                icon.className = "fas fa-sun text-slate-500";
+
+                // Un-Highlight Card
+                evCard.className = "glass-panel rounded-2xl p-6 transition-all duration-300";
+                evIcon.className = "fas fa-bolt text-primary";
+                evTitle.className = "font-bold text-xs uppercase tracking-widest text-slate-400";
+            }
+        }
+
+        // MAIN CALCULATION ENGINE
+        function calc() {
+            // 1. Gather Inputs
+            const dailyKm = parseFloat(document.getElementById('in-daily').value);
+            const years = parseInt(document.getElementById('in-years').value);
+            const isFinanced = document.getElementById('in-is-financed').checked;
+            
+            // Visual toggle for inputs
+            const loanDiv = document.getElementById('loan-inputs');
+            if(isFinanced) {
+                loanDiv.classList.remove('opacity-30', 'pointer-events-none');
+            } else {
+                loanDiv.classList.add('opacity-30', 'pointer-events-none');
+            }
+
+            // Finance
+            const rate = parseFloat(document.getElementById('in-rate').value);
+            const term = parseFloat(document.getElementById('in-term').value);
+            const downPayment = parseFloat(document.getElementById('in-downpayment').value);
+            
+            // Inflation
+            const infFuel = parseFloat(document.getElementById('in-inf-fuel').value);
+            const infElec = parseFloat(document.getElementById('in-inf-elec').value);
+
+            // EV
+            const evPrice = parseFloat(document.getElementById('in-ev-price').value);
+            const subsidy = parseFloat(document.getElementById('in-ev-subsidy').value);
+            const efficiency = parseFloat(document.getElementById('in-eff').value); // Wh/km
+            const isSolar = document.getElementById('in-solar').checked;
+            const elecPrice = isSolar 
+                ? parseFloat(document.getElementById('in-solar-price').value) 
+                : parseFloat(document.getElementById('in-elec-price').value);
+
+            // ICE
+            const icePrice = parseFloat(document.getElementById('in-ice-price').value);
+            const mileage = parseFloat(document.getElementById('in-mileage').value); // km/L
+            const fuelPrice = parseFloat(document.getElementById('in-fuel-price').value); // /L
+            const iceMaint = parseFloat(document.getElementById('in-ice-maint').value);
+
+            // 2. Calculations
+            const annualKm = dailyKm * 365;
+            document.getElementById('res-annual-km').innerText = annualKm.toLocaleString();
+            document.getElementById('txt-years').innerText = years;
+
+            // Finance Costs
+            let evInterest = 0;
+            let iceInterest = 0;
+            if(isFinanced) {
+                const evPrincipal = (evPrice - subsidy) * (1 - downPayment/100);
+                const icePrincipal = icePrice * (1 - downPayment/100);
+                evInterest = calculateLoanInterest(evPrincipal, rate, term);
+                iceInterest = calculateLoanInterest(icePrincipal, rate, term);
+            }
+
+            // Cumulative Arrays
+            const evCostArr = [];
+            const iceCostArr = [];
+            const labels = [];
+
+            let evRunningTotal = (evPrice - subsidy) + evInterest; 
+            let iceRunningTotal = icePrice + iceInterest;
+
+            evCostArr.push(evRunningTotal);
+            iceCostArr.push(iceRunningTotal);
+            labels.push('Year 0');
+
+            let currFuel = fuelPrice;
+            let currElec = elecPrice;
+            let breakevenYear = null;
+
+            for(let i=1; i<=years; i++) {
+                // Inflate
+                currFuel *= (1 + infFuel/100);
+                currElec *= (1 + infElec/100);
+
+                const evRun = (annualKm * (efficiency/1000) * currElec) + CONSTANTS.EV_MAINT;
+                const iceRun = ((annualKm / mileage) * currFuel) + iceMaint;
+
+                evRunningTotal += evRun;
+                iceRunningTotal += iceRun;
+
+                evCostArr.push(evRunningTotal);
+                iceCostArr.push(iceRunningTotal);
+                labels.push(`Year ${i}`);
+
+                if (breakevenYear === null && evRunningTotal < iceRunningTotal) {
+                    breakevenYear = i;
+                }
+            }
+
+            // CO2 Calculations (Total Lifecycle)
+            const evMfgCo2 = CONSTANTS.CO2_EV_BODY_MFG + (CONSTANTS.BATT_SIZE * CONSTANTS.CO2_BATT_MFG);
+            const emissionFactor = isSolar ? CONSTANTS.CO2_SOLAR : CONSTANTS.CO2_GRID;
+            const evOpsCo2Yearly = (annualKm * (efficiency/1000) * emissionFactor) / 1000; 
+            const evTotalCo2 = evMfgCo2 + (evOpsCo2Yearly * years);
+
+            const iceOpsCo2Yearly = (annualKm / mileage) * CONSTANTS.CO2_PETROL * CONSTANTS.WTT_FACTOR;
+            const iceTotalCo2 = CONSTANTS.CO2_ICE_MFG + (iceOpsCo2Yearly * years);
+
+            const co2Saved = iceTotalCo2 - evTotalCo2;
+            const trees = co2Saved / CONSTANTS.CO2_PER_TREE; // Trees needed to absorb annual saving approx
+
+            // 3. Update DOM
+            const totalSavings = iceRunningTotal - evRunningTotal;
+            const cpkEv = evRunningTotal / (annualKm * years);
+            const cpkIce = iceRunningTotal / (annualKm * years);
+
+            document.getElementById('res-savings').innerText = formatMoney(totalSavings);
+            document.getElementById('res-savings').className = totalSavings > 0 ? "text-2xl font-bold font-mono text-primary" : "text-2xl font-bold font-mono text-secondary";
+            document.getElementById('res-savings-sub').innerText = totalSavings > 0 ? "Cheaper to go EV" : "Cheaper to go ICE";
+
+            document.getElementById('res-trees').innerText = Math.max(0, trees).toFixed(0);
+            document.getElementById('res-total-co2').innerText = (Math.max(0, co2Saved)/1000).toFixed(1) + " t";
+            
+            document.getElementById('res-breakeven').innerText = (breakevenYear !== null) ? breakevenYear + " Years" : "Never";
+            
+            // const interestDiff = Math.abs(evInterest - iceInterest);
+            // document.getElementById('res-interest').innerText = formatMoney(interestDiff);
+
+            document.getElementById('res-cpk-ev').innerText = "₹" + cpkEv.toFixed(1);
+            document.getElementById('res-cpk-ice').innerText = "₹" + cpkIce.toFixed(1);
+
+            // Bar Width logic
+            const maxCpk = Math.max(cpkEv, cpkIce);
+            const evWidth = (cpkEv / maxCpk) * 100;
+            document.getElementById('bar-ev').style.width = evWidth + "%";
+
+            // Insight Text
+            const diffUpfront = (evPrice - subsidy) - icePrice;
+            document.getElementById('res-diff-upfront').innerText = formatMoney(diffUpfront);
+            document.getElementById('res-diff-interest').innerText = formatMoney(evInterest - iceInterest);
+
+            // Store data for Charts
+            chartData = { 
+                labels, 
+                evCostArr, 
+                iceCostArr
+            };
+
+            // Re-render active chart
+            if(document.getElementById('tab-dashboard').classList.contains('active')) renderCostChart();
+        }
+
+        function renderCostChart() {
+            if(!chartData.evCostArr) return;
+            const ctx = document.getElementById('costChart').getContext('2d');
+            if(costChartInstance) costChartInstance.destroy();
+
+            Chart.defaults.color = COLORS.text;
+            Chart.defaults.font.family = 'Inter';
+
+            costChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [
+                        {
+                            label: 'Electric Vehicle',
+                            data: chartData.evCostArr,
+                            borderColor: COLORS.primary, 
+                            backgroundColor: COLORS.bg,
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'Combustion (ICE)',
+                            data: chartData.iceCostArr,
+                            borderColor: COLORS.secondary,
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            pointStyle: 'rectRot'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20 } },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleColor: '#fff',
+                            bodyColor: '#e2e8f0',
+                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed.y !== null) label += new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(context.parsed.y);
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: COLORS.grid },
+                            ticks: { callback: function(value) { return '₹' + value/100000 + 'L'; } }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Init
+        window.addEventListener('DOMContentLoaded', () => {
+            // Set initial state
+            document.getElementById('in-is-financed').checked = false;
+            calc();
+        });
+
+    </script>
+</body>
+</html>
